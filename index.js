@@ -10,7 +10,14 @@ const authRoutes = require('./src/routes/authRoutes')
 const blogRoutes = require('./src/routes/blogRoutes');
 const searchRoute = require('./src/routes/searchRoute');
 const {notificationRoutes} = require('./src/routes/notificationRoutes');
+const cors = require('cors')
 
+app.use(function(req, res, next) {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authentication");
+    next();
+});
+app.options('*', cors())
 app.use(express.json());
 app.use('/search',searchRoute);
 app.use('/posts',blogRoutes);
