@@ -14,11 +14,11 @@ router.post('/',async (req,res)=>{
     // console.log(req.user);
     const {title,description} = req.body;
     try{
-        const post = new Post({userId:req.user._id,title,description});
+        const post = new Post({userId:req.user._id,uname:req.user.uName,title,description});
         await post.save();
         const comments = await Comment.find({postId:post._id});
-        postingNotifications(req.user.subscribers,post._id,"newPost");
-        return res.status(201).send({message:"Post Created",data:{post,comments}});
+        postingNotifications(req.user.subscribers,req.user.uName,post._id,"posted a new post");
+        return res.status(201).send({message:"Post Created",data:{...post._doc,comments}});
     }
     catch(err){
         console.log(err.message)
@@ -26,28 +26,29 @@ router.post('/',async (req,res)=>{
     }
 });
 
+//to get all posts (feed)
 router.get('/',async(req,res)=>{
     try{
-        if(String(req.user.role)=='admin'){
-            const posts = await Post.find({});
-            // console.log(posts)
-            data = []
-            for(let post of posts){
-                // console.log(post);
-                const id = post.id
-                const comments = await Comment.find({postId:id});
-                data.push({post,comments});
-            }
-            return res.status(200).send({message:"Post Retrieved",data});
-        }
-        const posts = await Post.find({userId:req.user._id});
+        // if(String(req.user.role)=='admin'){
+        //     const posts = await Post.find({});
+        //     console.log(posts)
+        //     data = []
+        //     for(let post of posts){
+        //     console.log(post);
+        //         const id = post.id
+        //         const comments = await Comment.find({postId:id});
+        //         data.push({...post._doc,comments});
+        //     }
+        //     return res.status(200).send({message:"Post Retrieved",data});
+        // }
+        const posts = await Post.find({});
         // console.log(posts)
         data = []
         for(let post of posts){
             // console.log(post);
             const id = post.id
             const comments = await Comment.find({postId:id});
-            data.push({post,comments});
+            data.push({...post._doc,comments});
         }
         return res.status(200).send({message:"Post Retrieved",data});
     }
@@ -64,7 +65,7 @@ router.get('/:id',async(req,res)=>{
         // console.log(post)
         // if(post==null) throw new Error("Post Not Found");
         const comments = await Comment.find({postId:id});
-        return res.status(200).send({message:"Post Retrieved",data:{post,comments}});
+        return res.status(200).send({message:"Post Retrieved",data:{...post._doc,comments}});
     }
     catch(err){
         console.log(err.message)
@@ -78,7 +79,7 @@ router.put('/:id',async(req,res)=>{
         const {title,description} = req.body;
         const post = await Post.findByIdAndUpdate({_id:id},{$set:{title,description}},{useFindAndModify:false});
         const comments = await Comment.find({postId:id});
-        return res.status(202).send({message:"Post has been updated",data:{post,comments}});
+        return res.status(202).send({message:"Post has been updated",data:{...post._doc,comments}});
     }
     catch(err){
         console.log(err.message);
@@ -92,7 +93,7 @@ router.delete('/:id',async(req,res)=>{
         const comments = await Comment.find({postId:id});
         const post = await Post.findOne({_id:id});
         const post1 = await post.deleteOne();
-        return res.status(200).send({message:"Post has been deleted",data:{post1,comments}});
+        return res.status(200).send({message:"Post has been deleted",data:{...post1.doc,comments}});
     }
     catch(err){
         console.log(err.messsage);
@@ -106,20 +107,20 @@ router.post('/:id/comment',async(req,res)=>{
     const {content} = req.body;
 
     try{
-        const comment = new Comment({userId:req.user._id,postId:id,content});
+        const comment = new Comment({userId:req.user._id,uname:req.user.uName,postId:id,content});
         await comment.save();
         const comments = await Comment.find({postId:id});
         const post = await Post.findById({_id:id});
         userId = []
         if(String(post.userId)!=String(req.user._id))
-            userId.push(post.userId);
+            userId.push(post.uname);
 
         for(let c of comments){
-            if(!userId.includes(c.userId) && String(c.userId)!=String(req.user._id)){
-                userId.push(c.userId);
+            if(!userId.includes(c.uname) && String(c.userId)!=String(req.user._id)){
+                userId.push(c.uname);
             }
         }
-        postingNotifications(userId,id,"comment");
+        postingNotifications(userId,req.user.uName,id,"commented on your");
         return res.status(200).send({message:"Commented on this post!",data:comment});
     }
     catch(err){
@@ -175,7 +176,7 @@ router.delete('/:id/comment/:cid',async(req,res)=>{
             throw new Error("You can't access this comment")
         }
         const data = await comment.delete();
-        return res.status(204).send({message:"Updated the comment!",data});
+        return res.status(204).send({message:"Deleted the comment!",data});
     }
     catch(err){
         console.log(err.message)
@@ -197,8 +198,8 @@ router.post('/:id/like',async(req,res)=>{
             await post.save();
         }
         if(String(post.userId)!=String(req.user._id))
-            postingNotifications([post.userId],id,"Like");
-        return res.status(200).send({message:"Liked the post",data:{post,comments}});
+            postingNotifications([post.uname],req.user.uName,id,"liked your post");
+        return res.status(200).send({message:"Liked the post",data:{...post._doc,comments}});
     }
     catch(err){
         console.log(err.message)
@@ -218,7 +219,7 @@ router.post('/:id/unlike',async(req,res)=>{
             // console.log("Liking")
             await post.save();
         }
-        return res.status(200).send({message:"Unliked the post",data:{post,comments}});
+        return res.status(200).send({message:"Unliked the post",data:{...post._doc,comments}});
     }
     catch(err){
         console.log(err.message)
@@ -239,7 +240,7 @@ router.post('/:id/comment/:cid/like',async(req,res)=>{
             await comment.save();
         }
         const comments = await Comment.find({postId:id});
-        return res.status(200).send({message:"Liked the comment",data:{post,comments}});
+        return res.status(200).send({message:"Liked the comment",data:{...post._doc,comments}});
     }
     catch(err){
         console.log(err.message)
@@ -259,7 +260,7 @@ router.post('/:id/comment/:cid/unlike',async(req,res)=>{
             await comment.save();
         }
         const comments = await Comment.find({postId:id});
-        return res.status(200).send({message:"Unliked the comment",data:{post,comments}});
+        return res.status(200).send({message:"Unliked the comment",data:{...post._doc,comments}});
     }
     catch(err){
         console.log(err.message)

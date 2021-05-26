@@ -9,7 +9,7 @@ notificationRoutes.use(requireAuth,isVerified);
 
 notificationRoutes.get('/',async(req,res)=>{
     try{
-        const notifications = await Notification.find({userId:req.user._id});
+        const notifications = await Notification.find({uname:req.user.uName});
         return res.status(200).send({message:"Notifications retrieved successfully!",data:notifications});
     }
     catch(err){
@@ -19,15 +19,15 @@ notificationRoutes.get('/',async(req,res)=>{
 });
 
 notificationRoutes.post('/',async(req,res)=>{
-    const {userId,postId,content} = req.body;
+    const {uname,postId,content} = req.body;
     
     return postingNotifications(userId,postId,content);
 });
 
-async function postingNotifications(userId,postId,content){
+async function postingNotifications(unames,byUname,postId,content){
     try{
-        for(let id of userId){
-            const notification = new Notification({userId:id,postId,content});
+        for(let uname of unames){
+            const notification = new Notification({uname,byUname,postId,content});
             await notification.save();
         }
         // return res.status(201).send({message:"Notifcation Created"});

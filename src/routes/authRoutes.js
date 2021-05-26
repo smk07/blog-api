@@ -23,13 +23,32 @@ router.post('/signup',async(req,res)=>{
         // mailer(email,verificationToken,"Verify Yourself!","verify");
         mailer(email,`<h1>Click the link below to verify your Email </h1> 
                 <a href="http://127.0.0.1:3000/verify/?token=${verificationToken}"> Click here to Verify yourself</a>`);
-        return res.status(201).send({message:"Account Created Successfully",token});
+        return res.status(201).send({message:"Account Created Successfully",token,uname:user.uName,role:'member'});
     }
     catch(err){
-        console.log(err);
-        return res.status(400).send({message:"Username already exists!"});
+        console.log(Object.keys(err.keyValue)[0]);
+        if (err.name === 'MongoError' && err.code === 11000){
+            if(Object.keys(err.keyValue)[0]=='uName'){
+                return res.status(400).send({message:"Username already exists!"});
+            }
+        }
+        if (err.name === 'MongoError' && err.code === 11000){
+            if(Object.keys(err.keyValue)[0]=='email'){
+                return res.status(400).send({message:"Account already exists for this email!"});
+            }
+        }
+        return res.status(400).send({message:"Some error has occured!"});
     }
 });
+
+router.get('/verified',requireAuth,(req,res)=>{
+    console.log(req.user)
+    if(req.user.verified)
+        return res.status(200).send({data:true,message:"verified"});
+    else
+        return res.status(400).send({data:false,message:"error"});
+});
+
 router.post('/admin/signup',async(req,res)=>{
     const {uname,email,password,fname,lname} = req.body;
     // console.log(body);
@@ -48,6 +67,10 @@ router.post('/admin/signup',async(req,res)=>{
         console.log(err);
         return res.status(400).send({message:"Username already exists!"});
     }
+});
+
+router.get('/isAdmin',requireAuth,async(req,res)=>{
+    return res.status(200).send({message:"Successful",role:req.user.role,uname:req.user.uName});
 });
 
 router.get('/verify',async(req,res)=>{
@@ -115,11 +138,11 @@ router.post('/forgot',async (req,res)=>{
         }
         const token = jwt.sign({userId:user._id},SECRET_KEY,{expiresIn:"300s"});
         mailer(user.email,`<h1>Click the link below to reset your password </h1> 
-                <a href="http://127.0.0.1:3000/reset/?token=${token}"> Click here to reset your password</a>`);
+                <a href="http://127.0.0.1:4200/reset/?token=${token}"> Click here to reset your password</a>`);
         // console.log("Reset Password Mail Sent Successfully");
         return res.status(200).send({message:"Reset Password Link has been sent to your mail!"});
     }catch(err){
-        return res.status(400).send({message:"Invalid username or password!"});
+        return res.status(400).send({message:"Invalid username or email!"});
     }
 });
 
@@ -139,7 +162,7 @@ router.post('/signin',async(req,res)=>{
         }
         await user.comparePassword(password);
         const token = jwt.sign({userId:user._id},SECRET_KEY);
-        return res.status(200).send({message:"Successfully Signed in",token});
+        return res.status(200).send({message:"Successfully Signed in",token,uname:user.uName,role:user.role});
     }
     catch(err){
         return res.status(401).send({message:"Invalid Credentials"});
@@ -155,11 +178,13 @@ router.post('/:uname/subscribe',requireAuth,async(req,res)=>{
         const user = await User.findOne({uName:uname});
         const reqUser = await User.findById({_id:req.user._id});
         // console.log(user);
-        user.subscribers.push(req.user._id);
-        reqUser.subscribedTo.push(user._id);
-        await user.save();
-        await reqUser.save();
-        req.user = reqUser;
+        if(!user.subscribers.includes(req.user.uName)){
+            user.subscribers.push(req.user.uName);
+            reqUser.subscribedTo.push(user.uName);
+            await user.save();
+            await reqUser.save();
+            req.user = reqUser;
+        }
         return res.status(200).send({message:"Subscribed!"});
     }
     catch(err){
@@ -175,11 +200,13 @@ router.post('/:uname/unsubscribe',requireAuth,async(req,res)=>{
         const user = await User.findOne({uName:uname});
         const reqUser = await User.findById({_id:req.user._id});
         // console.log(user);
-        user.subscribers.pop(req.user._id);
-        reqUser.subscribedTo.pop(user._id);
-        await user.save();
-        await reqUser.save();
-        req.user = reqUser;
+        if(user.subscribers.includes(req.user.uName)){
+            user.subscribers.pop(req.user.uName);
+            reqUser.subscribedTo.pop(user.uName);
+            await user.save();
+            await reqUser.save();
+            req.user = reqUser;
+        }
         return res.status(200).send({message:"Unsubscribed!"});
     }
     catch(err){
@@ -194,12 +221,12 @@ router.get('/:uname',async(req,res)=>{
     try{
         const user = await User.findOne({uName:uname});
         const posts = await Post.find({userId:user.id});
-        data = []
+        pos = []
         for(let post of posts){
             const comments = await Comment.find({postId:post.id});
-            data.push({...post._doc,comments});
+            pos.push({...post._doc,comments});
         }
-        return res.status(200).send({message:"Successfully retrieved the profile!",data});
+        return res.status(200).send({message:"Successfully retrieved the profile!",data:{post:pos,user}});
     }
     catch(err){
         console.log(err.message)

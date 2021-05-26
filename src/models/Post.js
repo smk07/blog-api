@@ -8,6 +8,10 @@ const postSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref:'User',
     },
+    uname:{
+        type: String,
+        required:true,
+    },
     title:{
         type:String,
         required:true,

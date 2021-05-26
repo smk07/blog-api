@@ -2,13 +2,17 @@ const express = require('express')
 const mongoose = require('mongoose')
 
 const notificationSchema = new mongoose.Schema({
-    userId:{
-        type: mongoose.Schema.Types.ObjectId,
+    uname:{
+        type: String,
         required:true
     },
     postId:{
         type: mongoose.Schema.Types.ObjectId,
         required:true
+    },
+    byUname:{
+        type: String,
+        default: null,
     },
     content:{
         type:String,
