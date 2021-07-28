@@ -28,7 +28,7 @@ app.get('/',(req,res)=>{
     return res.status(200).send("Vanakam da mapla! Localhost la irundhu!");
 })
 
-const mongoURI = "mongodb+srv://smk07:07072001@cluster0.9uggk.mongodb.net/myFirstDatabase?retryWrites=true&w=majority";
+const mongoURI = "";
 
 mongoose.connect(mongoURI,{
     useCreateIndex:true,
